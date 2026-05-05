@@ -7,7 +7,7 @@
 A fully open-source CRM for LINE Official Accounts. **Free alternative to proprietary LINE CRM SaaS** (priced at ¥10,000–20,000+/month).
 Runs on Cloudflare's free tier. **$0/month server cost.** Fully operable from Claude Code.
 
-### ▶️ [Watch the walkthrough on YouTube (~10 min)](https://youtu.be/DiRuGaeq1sM)
+### ▶️ [Watch the walkthrough on YouTube (~20 min)](https://youtu.be/DiRuGaeq1sM)
 
 [![Click to play on YouTube — LINE Harness setup guide](https://img.youtube.com/vi/DiRuGaeq1sM/maxresdefault.jpg)](https://youtu.be/DiRuGaeq1sM)
 

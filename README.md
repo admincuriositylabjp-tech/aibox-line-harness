@@ -7,7 +7,7 @@
 LINE 公式アカウントの完全オープンソース CRM。**L社 / U社 の無料代替**。
 Cloudflare 無料枠で動く。サーバー代 **0 円**。Claude Code から全操作可能。
 
-### ▶️ [動画で見る (YouTube・約10分)](https://youtu.be/DiRuGaeq1sM)
+### ▶️ [動画で見る (YouTube・約20分)](https://youtu.be/DiRuGaeq1sM)
 
 [![クリックで YouTube を再生 — LINE Harness 導入の全手順](https://img.youtube.com/vi/DiRuGaeq1sM/maxresdefault.jpg)](https://youtu.be/DiRuGaeq1sM)
 
