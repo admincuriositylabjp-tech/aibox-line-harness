@@ -81,7 +81,24 @@ export async function getLineAccountById(
     .first<LineAccount>();
 }
 
-export async function getLineAccounts(db: D1Database): Promise<LineAccount[]> {
+export interface CacheStore {
+  get(key: string): Promise<any>;
+  set(key: string, value: any, options?: { ttl?: number }): Promise<any>;
+}
+
+export async function getLineAccounts(
+  db: D1Database,
+  cache?: CacheStore,
+): Promise<LineAccount[]> {
+  if (cache) {
+    const cached = await cache.get('line_accounts:all');
+    if (cached) return cached as LineAccount[];
+    const result = await db
+      .prepare(`SELECT * FROM line_accounts ORDER BY display_order ASC, created_at ASC`)
+      .all<LineAccount>();
+    await cache.set('line_accounts:all', result.results, { ttl: 60 });
+    return result.results;
+  }
   const result = await db
     .prepare(`SELECT * FROM line_accounts ORDER BY display_order ASC, created_at ASC`)
     .all<LineAccount>();

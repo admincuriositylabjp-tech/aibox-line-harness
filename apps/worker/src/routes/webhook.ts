@@ -19,7 +19,7 @@ import {
   getEntryRouteByRefCode,
   getMessageTemplateById,
 } from '@line-crm/db';
-import type { EntryRoute } from '@line-crm/db';
+import type { EntryRoute, LineAccount } from '@line-crm/db';
 import { fireEvent } from '../services/event-bus.js';
 import { buildMessage, expandVariables } from '../services/step-delivery.js';
 import type { Env } from '../index.js';
@@ -75,10 +75,35 @@ webhook.post('/webhook', async (c) => {
   let valid = false;
 
   const envSecret = c.env.LINE_CHANNEL_SECRET;
+
+  // AIBOX multi-tenant optimization: single getLineAccounts call with caching
+  let accounts: LineAccount[];
+  try {
+    const cacheAdapter = {
+      get: async (key: string) => {
+        const cachedResponse = await caches.default.match(new Request(`https://cache.internal/${key}`));
+        if (cachedResponse) return cachedResponse.json();
+        return null;
+      },
+      set: async (key: string, value: any, options?: { ttl?: number }) => {
+        const maxAge = options?.ttl ?? 60;
+        await caches.default.put(
+          new Request(`https://cache.internal/${key}`),
+          new Response(JSON.stringify(value), {
+            headers: { 'Cache-Control': `max-age=${maxAge}` },
+          }),
+        );
+      },
+    };
+    accounts = await getLineAccounts(db, cacheAdapter);
+  } catch {
+    // Fallback: cache unavailable — call without cache
+    accounts = await getLineAccounts(db);
+  }
+
   if (envSecret) {
     valid = await verifySignature(envSecret, rawBody, signature);
     if (valid) {
-      const accounts = await getLineAccounts(db);
       const main = accounts.find(
         (a) => a.is_active && a.channel_secret === envSecret,
       );
@@ -90,7 +115,6 @@ webhook.post('/webhook', async (c) => {
   }
 
   if (!valid) {
-    const accounts = await getLineAccounts(db);
     for (const account of accounts) {
       if (!account.is_active) continue;
       if (envSecret && account.channel_secret === envSecret) continue; // already tried via fast path
