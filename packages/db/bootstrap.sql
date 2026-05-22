@@ -693,14 +693,15 @@ CREATE TABLE staff (
 );
 
 CREATE TABLE staff_members (
-  id         TEXT PRIMARY KEY,
-  name       TEXT NOT NULL,
-  email      TEXT,
-  role       TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'staff')),
-  api_key    TEXT UNIQUE NOT NULL,
-  is_active  INTEGER NOT NULL DEFAULT 1,
-  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+  id              TEXT PRIMARY KEY,
+  name            TEXT NOT NULL,
+  email           TEXT,
+  role            TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'staff')),
+  api_key         TEXT UNIQUE NOT NULL,
+  line_account_id TEXT REFERENCES line_accounts(id),
+  is_active       INTEGER NOT NULL DEFAULT 1,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
 CREATE TABLE staff_menus (

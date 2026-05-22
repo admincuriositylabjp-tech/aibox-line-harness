@@ -7,6 +7,7 @@ export interface StaffMember {
   role: 'owner' | 'admin' | 'staff';
   api_key: string;
   is_active: number;
+  line_account_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -15,6 +16,7 @@ export interface CreateStaffInput {
   name: string;
   email?: string | null;
   role: 'owner' | 'admin' | 'staff';
+  lineAccountId?: string | null;
 }
 
 export interface UpdateStaffInput {
@@ -34,11 +36,11 @@ function generateApiKey(): string {
 export async function getStaffByApiKey(
   db: D1Database,
   apiKey: string,
-): Promise<StaffMember | null> {
+): Promise<(StaffMember & { line_account_id: string | null }) | null> {
   return db
     .prepare('SELECT * FROM staff_members WHERE api_key = ? AND is_active = 1')
     .bind(apiKey)
-    .first<StaffMember>();
+    .first<StaffMember & { line_account_id: string | null }>();
 }
 
 export async function getStaffMembers(db: D1Database): Promise<StaffMember[]> {
@@ -68,10 +70,10 @@ export async function createStaffMember(
 
   await db
     .prepare(
-      `INSERT INTO staff_members (id, name, email, role, api_key, is_active, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
+      `INSERT INTO staff_members (id, name, email, role, api_key, is_active, line_account_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`,
     )
-    .bind(id, input.name, input.email ?? null, input.role, apiKey, now, now)
+    .bind(id, input.name, input.email ?? null, input.role, apiKey, input.lineAccountId ?? null, now, now)
     .run();
 
   return (await db

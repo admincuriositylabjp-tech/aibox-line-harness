@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS friends (
   is_following     INTEGER NOT NULL DEFAULT 1,
   user_id          TEXT,
   ig_igsid         TEXT,
+  line_account_id  TEXT,
   score            INTEGER NOT NULL DEFAULT 0,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
@@ -55,6 +56,7 @@ CREATE TABLE IF NOT EXISTS scenarios (
   trigger_tag_id  TEXT REFERENCES tags (id) ON DELETE SET NULL,
   is_active       INTEGER NOT NULL DEFAULT 1,
   delivery_mode   TEXT NOT NULL DEFAULT 'relative' CHECK (delivery_mode IN ('relative', 'elapsed', 'absolute_time')),
+  line_account_id TEXT,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
@@ -123,7 +125,8 @@ CREATE TABLE IF NOT EXISTS broadcasts (
   dedup_priority     TEXT CHECK (dedup_priority IS NULL OR json_valid(dedup_priority)),
   failed_account_ids TEXT CHECK (failed_account_ids IS NULL OR json_valid(failed_account_ids)),
   dedup_progress     TEXT CHECK (dedup_progress IS NULL OR json_valid(dedup_progress)),
-  batch_lock_at      TEXT
+  batch_lock_at      TEXT,
+  line_account_id    TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_broadcasts_status ON broadcasts (status);
@@ -368,6 +371,7 @@ CREATE TABLE IF NOT EXISTS reminders (
   id          TEXT PRIMARY KEY,
   name        TEXT NOT NULL,
   description TEXT,
+  line_account_id TEXT,
   is_active   INTEGER NOT NULL DEFAULT 1,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
@@ -465,6 +469,7 @@ CREATE TABLE IF NOT EXISTS chats (
   status        TEXT NOT NULL DEFAULT 'unread' CHECK (status IN ('unread', 'in_progress', 'resolved')),
   notes         TEXT,
   last_message_at TEXT,
+  line_account_id TEXT,
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
@@ -557,6 +562,7 @@ CREATE TABLE IF NOT EXISTS automations (
   actions     TEXT NOT NULL DEFAULT '[]',
   is_active   INTEGER NOT NULL DEFAULT 1,
   priority    INTEGER NOT NULL DEFAULT 0,
+  line_account_id TEXT,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );

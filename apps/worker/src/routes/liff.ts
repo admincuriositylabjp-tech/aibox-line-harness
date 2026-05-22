@@ -720,6 +720,8 @@ liffRoutes.get('/auth/callback', async (c) => {
       displayName,
       pictureUrl,
       statusMessage: null,
+      // lineAccountId is set by the auth middleware via currentAccountId when available
+      lineAccountId: (c.get('currentAccountId') as string) || undefined,
     });
 
     // IG cross-platform UUID linkage (OAuth path — new friends & returning users

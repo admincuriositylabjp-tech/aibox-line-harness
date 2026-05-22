@@ -139,6 +139,7 @@ export interface UpsertFriendInput {
   displayName?: string | null;
   pictureUrl?: string | null;
   statusMessage?: string | null;
+  lineAccountId?: string | null;
 }
 
 export async function upsertFriend(
@@ -146,36 +147,24 @@ export async function upsertFriend(
   input: UpsertFriendInput,
 ): Promise<Friend> {
   const now = jstNow();
-  const existing = await getFriendByLineUserId(db, input.lineUserId);
 
-  if (existing) {
-    await db
-      .prepare(
-        `UPDATE friends
-         SET display_name = ?,
-             picture_url = ?,
-             status_message = ?,
-             is_following = 1,
-             updated_at = ?
-         WHERE line_user_id = ?`,
-      )
-      .bind(
-        'displayName' in input ? (input.displayName ?? null) : existing.display_name,
-        'pictureUrl' in input ? (input.pictureUrl ?? null) : existing.picture_url,
-        'statusMessage' in input ? (input.statusMessage ?? null) : existing.status_message,
-        now,
-        input.lineUserId,
-      )
-      .run();
-
-    return (await getFriendByLineUserId(db, input.lineUserId))!;
-  }
-
+  // Atomic upsert using INSERT ... ON CONFLICT
+  // This combines the SELECT-then-INSERT-or-UPDATE into a single atomic operation
   const id = crypto.randomUUID();
+
   await db
     .prepare(
-      `INSERT INTO friends (id, line_user_id, display_name, picture_url, status_message, is_following, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
+      `INSERT INTO friends (id, line_user_id, display_name, picture_url, status_message, is_following, line_account_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)
+       ON CONFLICT(line_user_id) DO UPDATE SET
+         display_name = COALESCE(EXCLUDED.display_name, friends.display_name),
+         picture_url = COALESCE(EXCLUDED.picture_url, friends.picture_url),
+         status_message = COALESCE(EXCLUDED.status_message, friends.status_message),
+         is_following = 1,
+         line_account_id = COALESCE(EXCLUDED.line_account_id, friends.line_account_id),
+         updated_at = EXCLUDED.updated_at
+       WHERE friends.line_account_id IS NULL
+          OR EXCLUDED.line_account_id = friends.line_account_id`,
     )
     .bind(
       id,
@@ -183,12 +172,18 @@ export async function upsertFriend(
       input.displayName ?? null,
       input.pictureUrl ?? null,
       input.statusMessage ?? null,
+      input.lineAccountId ?? null,
       now,
       now,
     )
     .run();
 
-  return (await getFriendById(db, id))!;
+  // Return the upserted friend
+  const friend = await getFriendByLineUserId(db, input.lineUserId);
+  if (!friend) {
+    throw new Error(`Failed to upsert friend with line_user_id=${input.lineUserId}`);
+  }
+  return friend;
 }
 
 export async function updateFriendFollowStatus(
