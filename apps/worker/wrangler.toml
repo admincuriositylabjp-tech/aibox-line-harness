@@ -13,7 +13,7 @@ workers_dev = true
 # デフォルト = テスト環境 (noda@)
 # 使い方: npx wrangler deploy
 # ═══════════════════════════════════════════════════════════════
-account_id = "c40947ff58a767be74a53be79a89d68a"
+account_id = "608de1180f4c70f1351880ec58ca4e6b"
 
 [assets]
 directory = "dist/client"
@@ -21,8 +21,9 @@ binding = "ASSETS"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "line-harness"
-database_id = "7efe7c20-01ae-4d65-be08-0d7b4202e8a1"
+database_name = "AIBOX-db"
+database_id = "6ea6d7b3-e68e-4a2b-8de3-a1c26bf79342"
+migrations_dir = "../../packages/db/migrations"
 
 [[r2_buckets]]
 binding = "IMAGES"

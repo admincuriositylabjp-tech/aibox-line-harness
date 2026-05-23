@@ -8,18 +8,18 @@
  *   GAP-03~05: Race conditions on friend upsert + line_account_id assignment
  *
  * SQL injection strategy:
- *   - SELECT: appends `WHERE line_account_id = ?` before ORDER BY / LIMIT
+ *   - SELECT: appends `WHERE ${lineAccountIdCol} = ?` before ORDER BY / LIMIT
  *   - INSERT (VALUES): rewrites column list + VALUES to include line_account_id
  *   - INSERT (SELECT): appends WHERE to the inner SELECT
- *   - UPDATE: inserts `line_account_id = ?` into SET and `AND line_account_id = ?`
+ *   - UPDATE: inserts `${lineAccountIdCol} = ?` into SET and `AND ${lineAccountIdCol} = ?`
  *     into the SET-value WHERE (the one between SET and WHERE)
- *   - DELETE: appends `AND line_account_id = ?` to any existing WHERE,
- *     or adds `WHERE line_account_id = ?` if none exists
+ *   - DELETE: appends `AND ${lineAccountIdCol} = ?` to any existing WHERE,
+ *     or adds `WHERE ${lineAccountIdCol} = ?` if none exists
  *
  * JOINs: table-qualified alias (e.g. `f.line_account_id`) is expected when
  * the query uses a table alias. This class only appends `line_account_id`,
  * NOT a table prefix — callers with JOINs must use qualified column names
- * (e.g. `WHERE f.line_account_id = ?`) in their original SQL, and the proxy
+ * (e.g. `WHERE f.${lineAccountIdCol} = ?`) in their original SQL, and the proxy
  * will use the unqualified `line_account_id` for simple queries.
  */
 
@@ -72,7 +72,7 @@ export class TenantStatement {
 
 /**
  * SQL injection helper — rewrites a SQL statement to add a
- * `line_account_id = ?` guard.
+ * `${lineAccountIdCol} = ?` guard.
  *
  * Returns `{ sql, needsExternalBind: boolean }`.
  * - When `needsExternalBind` is true, the caller MUST append `accountId`
@@ -83,9 +83,11 @@ export class TenantStatement {
 function injectLineAccountId(
   sql: string,
   accountId: string,
+  tableAlias?: string,
 ): { sql: string; needsExternalBind: boolean } {
   const trimmed = sql.trim();
   const upper = trimmed.toUpperCase();
+  const lineAccountIdCol = tableAlias ? `${tableAlias}.line_account_id` : 'line_account_id';
 
   // --- SELECT ---
   if (upper.startsWith('SELECT')) {
@@ -103,22 +105,22 @@ function injectLineAccountId(
       // Simple approach: inject before ORDER BY at the end, or at end
       if (orderByIdx !== -1) {
         insertAt = orderByIdx;
-        clause = ' WHERE line_account_id = ?';
+        clause = ` WHERE ${lineAccountIdCol} = ?`;
       } else if (limitIdx !== -1) {
         insertAt = limitIdx;
-        clause = ' WHERE line_account_id = ?';
+        clause = ` WHERE ${lineAccountIdCol} = ?`;
       } else {
-        clause = ' WHERE line_account_id = ?';
+        clause = ` WHERE ${lineAccountIdCol} = ?`;
       }
     } else {
       if (orderByIdx !== -1) {
         insertAt = orderByIdx;
-        clause = ' WHERE line_account_id = ?';
+        clause = ` WHERE ${lineAccountIdCol} = ?`;
       } else if (limitIdx !== -1) {
         insertAt = limitIdx;
-        clause = ' WHERE line_account_id = ?';
+        clause = ` WHERE ${lineAccountIdCol} = ?`;
       } else {
-        clause = ' WHERE line_account_id = ?';
+        clause = ` WHERE ${lineAccountIdCol} = ?`;
       }
     }
 
@@ -134,7 +136,7 @@ function injectLineAccountId(
         offsetIdx !== -1 ? offsetIdx : trimmed.length,
       );
       // Insert before the next clause
-      clause = ' AND line_account_id = ?';
+      clause = ` AND ${lineAccountIdCol} = ?`;
       insertAt = whereEnd;
     }
 
@@ -179,7 +181,7 @@ function injectLineAccountId(
     if (upper.includes('SELECT')) {
       const selectIdx = upper.indexOf('SELECT', 6); // skip INSERT prefix
       if (selectIdx !== -1) {
-        const inner = injectLineAccountId(trimmed.slice(selectIdx), accountId);
+        const inner = injectLineAccountId(trimmed.slice(selectIdx), accountId, tableAlias);
         return {
           sql: trimmed.slice(0, selectIdx) + inner.sql,
           needsExternalBind: inner.needsExternalBind,
@@ -206,8 +208,8 @@ function injectLineAccountId(
 
   // --- UPDATE ---
   if (upper.startsWith('UPDATE')) {
-    // UPDATE table SET col = ? WHERE ... → Inject line_account_id = ? into SET
-    // and add AND line_account_id = ? to WHERE
+    // UPDATE table SET col = ? WHERE ... → Inject ${lineAccountIdCol} = ? into SET
+    // and add AND ${lineAccountIdCol} = ? to WHERE
     const setIdx = upper.indexOf('SET');
     if (setIdx !== -1) {
       const whereIdx = upper.indexOf('WHERE', setIdx);
@@ -216,18 +218,18 @@ function injectLineAccountId(
         const setEnd = whereIdx;
         const newSql =
           trimmed.slice(0, setEnd) +
-          ', line_account_id = ?' +
+          `, ${lineAccountIdCol} = ?` +
           trimmed.slice(setEnd, trimmed.length) +
-          ' AND line_account_id = ?';
+          ` AND ${lineAccountIdCol} = ?`;
         return { sql: newSql, needsExternalBind: true };
       } else {
         // No WHERE — inject into SET and add WHERE
         const newSql =
-          trimmed + ', line_account_id = ? WHERE line_account_id = ?';
+          `${trimmed}, ${lineAccountIdCol} = ? WHERE ${lineAccountIdCol} = ?`;
         return { sql: newSql, needsExternalBind: true };
       }
     }
-    return { sql: trimmed + ' WHERE line_account_id = ?', needsExternalBind: true };
+    return { sql: trimmed + ` WHERE ${lineAccountIdCol} = ?`, needsExternalBind: true };
   }
 
   // --- DELETE ---
@@ -236,11 +238,11 @@ function injectLineAccountId(
     if (whereIdx !== -1) {
       const newSql =
         trimmed.slice(0, whereIdx + 5) +
-        ' line_account_id = ? AND ' +
+        ` ${lineAccountIdCol} = ? AND ` +
         trimmed.slice(whereIdx + 5);
       return { sql: newSql, needsExternalBind: true };
     }
-    return { sql: trimmed + ' WHERE line_account_id = ?', needsExternalBind: true };
+    return { sql: trimmed + ` WHERE ${lineAccountIdCol} = ?`, needsExternalBind: true };
   }
 
   // Non-injectable statement type
@@ -259,7 +261,7 @@ function injectLineAccountId(
  *   .all();
  * ```
  *
- * Every query is transparently rewritten to include `line_account_id = ?`.
+ * Every query is transparently rewritten to include `${lineAccountIdCol} = ?`.
  */
 export class TenantDB {
   private db: D1Database;
@@ -276,8 +278,8 @@ export class TenantDB {
     this.accountId = accountId;
   }
 
-  prepare(sql: string): TenantStatement {
-    const { sql: rewritten, needsExternalBind } = injectLineAccountId(sql, this.accountId);
+  prepare(sql: string, tableAlias?: string): TenantStatement {
+    const { sql: rewritten, needsExternalBind } = injectLineAccountId(sql, this.accountId, tableAlias);
 
     if (!needsExternalBind) {
       // For statements where we couldn't inject a parameter (e.g. already has

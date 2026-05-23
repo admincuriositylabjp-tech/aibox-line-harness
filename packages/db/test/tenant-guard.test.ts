@@ -44,10 +44,14 @@ class MockD1Database {
   calls: { sql: string; binds: unknown[] }[] = [];
 
   prepare(sql: string): MockStatement {
+    // Capture the SQL when prepare is called
+    const callRecord = { sql, binds: [] as unknown[] };
+    this.calls.push(callRecord);
+    
     const stmt = new MockStatement(sql);
     const originalBind = stmt.bind.bind(stmt);
     stmt.bind = (...params: unknown[]) => {
-      this.calls.push({ sql, binds: params });
+      callRecord.binds = params;
       return originalBind(...params);
     };
     return stmt;
@@ -110,6 +114,48 @@ describe('TenantDB', () => {
   it('should return accountId via getAccountId()', () => {
     const tenantDb = new TenantDB(mockDb as unknown as D1Database, 'acc-get');
     expect(tenantDb.getAccountId()).toBe('acc-get');
+  });
+
+  describe('JOIN query alias support', () => {
+    it('should inject unqualified line_account_id for queries without alias', () => {
+      const tenantDb = new TenantDB(mockDb as unknown as D1Database, 'acc-join-no-alias');
+      tenantDb.prepare(
+        'SELECT f.* FROM friends f JOIN tags t ON f.id = t.friend_id WHERE f.is_following = 1',
+      );
+      const calls = mockDb.getCalls();
+      expect(calls[0].sql).toContain('line_account_id = ?');
+      expect(calls[0].sql).not.toContain('f.line_account_id = ?');
+    });
+
+    it('should inject qualified line_account_id when table alias is provided', () => {
+      const tenantDb = new TenantDB(mockDb as unknown as D1Database, 'acc-join-alias');
+      tenantDb.prepare(
+        'SELECT f.* FROM friends f JOIN tags t ON f.id = t.friend_id WHERE f.is_following = 1',
+        'f', // table alias for friends table
+      );
+      const calls = mockDb.getCalls();
+      expect(calls[0].sql).toContain('f.line_account_id = ?');
+    });
+
+    it('should handle UPDATE with table alias', () => {
+      const tenantDb = new TenantDB(mockDb as unknown as D1Database, 'acc-update-alias');
+      tenantDb.prepare(
+        'UPDATE friends f SET f.display_name = ? WHERE f.line_user_id = ?',
+        'f',
+      );
+      const calls = mockDb.getCalls();
+      expect(calls[0].sql).toContain('f.line_account_id = ?');
+    });
+
+    it('should handle DELETE with table alias', () => {
+      const tenantDb = new TenantDB(mockDb as unknown as D1Database, 'acc-del-alias');
+      tenantDb.prepare(
+        'DELETE FROM friends f WHERE f.line_user_id = ?',
+        'f',
+      );
+      const calls = mockDb.getCalls();
+      expect(calls[0].sql).toContain('f.line_account_id = ?');
+    });
   });
 });
 
