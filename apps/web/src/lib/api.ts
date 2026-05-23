@@ -1555,8 +1555,41 @@ export const eventsApi = {
       { method: 'PUT', body: JSON.stringify(body) },
     ),
 
-  pendingCount: (accountId: string) =>
+pendingCount: (accountId: string) =>
     fetchApi<{ count: number }>(
-      withAccount('/api/events/admin/events/notifications/pending', accountId),
+      withAccount(`/api/events/admin/events/bookings/pending-count`, accountId),
     ),
-};
+} as const
+
+// ── Public APIs (no auth) ───────────────────────────────────────────────
+export const publicApi = {
+  /**
+   * POST /api/onboarding/register — 認証不要。新規テナント登録
+   */
+  onboarding: {
+    register: (data: {
+      name: string
+      channelId: string
+      channelAccessToken: string
+      channelSecret?: string
+      adminName: string
+      loginChannelId?: string
+      loginChannelSecret?: string
+      liffId?: string
+    }) =>
+      fetchApi<{
+        success: boolean
+        data?: {
+          account: { id: string; name: string; channelId: string }
+          admin: { id: string; name: string; role: string; apiKey: string }
+          webhook: { configured: boolean; error: string | null }
+        }
+        error?: string
+      }>('/api/onboarding/register', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    health: () =>
+      fetchApi<{ success: boolean; data: { status: string; service: string } }>('/api/onboarding/health'),
+  },
+}
