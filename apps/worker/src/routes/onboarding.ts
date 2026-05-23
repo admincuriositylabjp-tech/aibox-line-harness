@@ -34,6 +34,9 @@ onboarding.post('/api/onboarding/register', async (c) => {
       channelAccessToken: string;  // LINE OA channel access token
       channelSecret?: string;      // LINE OA channel secret
       adminName: string;           // 管理者の氏名
+      loginChannelId?: string;     // LINE Login channel ID（LIFF認証用）
+      loginChannelSecret?: string; // LINE Login channel secret
+      liffId?: string;             // LIFF ID（LIFFアプリ用）
     }>();
 
     // バリデーション
@@ -71,6 +74,9 @@ onboarding.post('/api/onboarding/register', async (c) => {
       name: body.name,
       channelAccessToken: body.channelAccessToken,
       channelSecret: body.channelSecret || '',
+      loginChannelId: body.loginChannelId,
+      loginChannelSecret: body.loginChannelSecret,
+      liffId: body.liffId,
     });
 
     // 2) staff_members 作成（owner権限）
@@ -87,6 +93,8 @@ onboarding.post('/api/onboarding/register', async (c) => {
           id: account.id,
           name: account.name,
           channelId: account.channel_id,
+          loginChannelId: account.login_channel_id,
+          liffId: account.liff_id,
         },
         admin: {
           id: admin.id,
