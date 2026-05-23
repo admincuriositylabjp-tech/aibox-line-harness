@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
-import { createLineAccount, createStaffMember } from '@line-crm/db';
+import { createLineAccount, createStaffMember, getLineAccountById } from '@line-crm/db';
+import { LineClient } from '@line-crm/line-sdk';
 import type { Env } from '../index.js';
 
 const onboarding = new Hono<Env>();
@@ -21,9 +22,24 @@ async function verifyLineCredentials(accessToken: string): Promise<{ ok: boolean
   }
 }
 
+// Set webhook endpoint URL for a LINE account
+// Best-effort: returns success/failure but doesn't throw
+async function setupWebhook(
+  accessToken: string,
+  workerUrl: string,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const client = new LineClient(accessToken);
+    await client.setWebhookEndpointUrl(`${workerUrl}/webhook`);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: `Webhook setup failed: ${err}` };
+  }
+}
+
 // POST /api/onboarding/register
 // 新規テナント（整体院）が自前のLINE公式アカウントを登録するエンドポイント。
-// line_accounts + staff_members（owner権限）を一括作成する。
+// line_accounts + staff_members（owner権限）を一括作成＋Webhook自動設定。
 // 認証不要（新規登録のため）。
 onboarding.post('/api/onboarding/register', async (c) => {
   try {
@@ -86,6 +102,14 @@ onboarding.post('/api/onboarding/register', async (c) => {
       lineAccountId: account.id,
     });
 
+    // 3) Webhook自動設定（ベストエフォート）
+    let webhookResult: { ok: boolean; error?: string } | null = null;
+    if (c.env.WORKER_URL) {
+      webhookResult = await setupWebhook(body.channelAccessToken, c.env.WORKER_URL);
+    } else {
+      webhookResult = { ok: false, error: 'WORKER_URL not configured' };
+    }
+
     return c.json({
       success: true,
       data: {
@@ -102,10 +126,42 @@ onboarding.post('/api/onboarding/register', async (c) => {
           role: admin.role,
           apiKey: admin.api_key,  // 初回のみ返す、二度と取得不可。管理者はこのキーを安全に保管する。
         },
+        webhook: {
+          configured: webhookResult.ok,
+          error: webhookResult.error || null,
+        },
       },
     }, 201);
   } catch (err) {
     console.error('POST /api/onboarding/register error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// POST /api/onboarding/:accountId/setup-webhook
+// 既存accountのWebhook設定を再実行（エラー時リカバリ用）
+// 認証なし（accountIdを知っている人のみアクセス可能）
+onboarding.post('/api/onboarding/:accountId/setup-webhook', async (c) => {
+  try {
+    const accountId = c.req.param('accountId');
+    const account = await getLineAccountById(c.env.DB, accountId);
+    if (!account) {
+      return c.json({ success: false, error: 'Account not found' }, 404);
+    }
+
+    const workerUrl = c.env.WORKER_URL;
+    if (!workerUrl) {
+      return c.json({ success: false, error: 'WORKER_URL not configured' }, 500);
+    }
+
+    const result = await setupWebhook(account.channel_access_token, workerUrl);
+    if (!result.ok) {
+      return c.json({ success: false, error: result.error }, 500);
+    }
+
+    return c.json({ success: true, data: { webhookUrl: `${workerUrl}/webhook` } });
+  } catch (err) {
+    console.error('POST /api/onboarding/:accountId/setup-webhook error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

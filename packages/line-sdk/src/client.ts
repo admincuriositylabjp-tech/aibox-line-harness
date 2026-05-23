@@ -250,7 +250,7 @@ export class LineClient {
   /**
    * Get statistics per unit for multicast messages.
    * GET only — no messages are sent.
-   */
+/** Get statistics per unit for multicast messages. */
   async getUnitInsight(
     customAggregationUnit: string,
     from: string,
@@ -262,5 +262,24 @@ export class LineClient {
       `/v2/bot/insight/message/event/aggregation?${params.toString()}`,
     );
     return data;
+  }
+
+  // ─── Webhook ──────────────────────────────────────────────────────────────
+
+  /**
+   * Set the webhook endpoint URL for this bot.
+   * PUT https://api.line.me/v2/bot/channel/webhook/endpoint
+   */
+  async setWebhookEndpointUrl(endpoint: string): Promise<void> {
+    await this.request('PUT', '/v2/bot/channel/webhook/endpoint', { endpoint });
+  }
+
+  /**
+   * Get the current webhook endpoint URL.
+   * GET https://api.line.me/v2/bot/channel/webhook/endpoint
+   */
+  async getWebhookEndpointUrl(): Promise<{ endpoint: string; active: boolean }> {
+    const { data } = await this.request('GET', '/v2/bot/channel/webhook/endpoint');
+    return data as { endpoint: string; active: boolean };
   }
 }
